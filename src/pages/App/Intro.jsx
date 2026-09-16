@@ -1,25 +1,30 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { onAuthStateChanged } from "firebase/auth"
-import { auth } from "../../services/firebase"
-import LoadingScreen from "../../components/App/Home/LoadingScreen"
-
 import {
-  ShieldCheck,
-  Radar,
-  TrendingUp,
+  Activity,
   ArrowRight,
- Sparkles,
+  Leaf,
+  LogIn,
+  Radar,
   ScanSearch,
-  MonitorSmartphone,
+  ShieldCheck,
 } from "lucide-react"
 
+import { auth } from "../../services/firebase"
+import LoadingScreen from "../../components/App/Home/LoadingScreen"
 import "../../styles/App/Intro.css"
 
 const Logo = "/assets/image/Logo-redonda.png"
+const SoyCutout = "/assets/image/soja-hero-cutout.png"
+
+const highlights = [
+  { icon: ShieldCheck, label: "Diagnóstico confiável" },
+  { icon: Activity, label: "Acompanhamento contínuo" },
+  { icon: Radar, label: "Decisões em tempo real" },
+]
 
 export default function Intro() {
-
   const navigate = useNavigate()
   const [checkingAuth, setCheckingAuth] = useState(true)
 
@@ -39,172 +44,101 @@ export default function Intro() {
   if (checkingAuth) return <LoadingScreen />
 
   return (
+    <main className="intro" data-system-bar-color="#f4f8ef">
+      <div className="intro-orb intro-orb--top" aria-hidden="true" />
+      <div className="intro-orb intro-orb--bottom" aria-hidden="true" />
 
-    <main className="intro" data-system-bar-color="#07110b">
-
-      {/* BACKGROUND */}
-      <div className="intro-bg">
-
-        <div className="intro-overlay" />
-
-        <div className="intro-gradient" />
-
-      </div>
-
-      {/* HERO */}
-      <section className="intro-hero">
-
-        {/* BADGE */}
-        <div className="intro-badge">
-
-          <ScanSearch size={14} />
-
-          <span>
-            Drone agrícola com inteligência artificial
+      <div className="intro-shell">
+        <header className="intro-brand" aria-label="Zenith">
+          <div className="intro-brand__mark">
+            <img src={Logo} alt="" draggable="false" />
+          </div>
+          <div className="intro-brand__copy">
+            <strong>Zenith</strong>
+            <span>Agricultura de precisão</span>
+          </div>
+          <span className="intro-brand__icon" aria-hidden="true">
+            <Leaf size={19} strokeWidth={2} />
           </span>
+        </header>
 
-        </div>
+        <section className="intro-layout">
+          <div className="intro-visual" aria-label="Lavoura monitorada pela plataforma Zenith">
+            <div className="intro-visual__shade" aria-hidden="true" />
+            <div className="intro-visual__grid" aria-hidden="true" />
 
-        {/* CONTENT */}
-        <div className="intro-content">
+            <div className="intro-visual__tag">
+              <ScanSearch size={16} strokeWidth={2.1} />
+              <span>Inteligência aplicada ao campo</span>
+            </div>
 
-          {/* TEXT */}
-          <div className="intro-text">
+            <img
+              className="intro-visual__soy"
+              src={SoyCutout}
+              alt="Vagem de soja"
+              draggable="false"
+            />
+
+            <div className="intro-visual__caption">
+              <span className="intro-visual__signal" aria-hidden="true" />
+              <div>
+                <strong>Monitoramento ativo</strong>
+                <small>Dados do campo em uma única visão</small>
+              </div>
+            </div>
+          </div>
+
+          <div className="intro-content">
+            <div className="intro-eyebrow">
+              <Radar size={16} strokeWidth={2.2} />
+              <span>Tecnologia para quem produz</span>
+            </div>
 
             <h1>
-
-              Monitoramento
-
-              <span>
-                Inteligente</span>
-
+              Seu campo, visto com <em>mais precisão.</em>
             </h1>
 
-            {/* MINI LABEL */}
-            <div className="intro-mini-label">
-
-              <span className="mini-line" />
-
-              <p>
-                Tecnologia aérea inteligente para
-                análise agrícola em tempo real
-              </p>
-
-            </div>
-
-            {/* DESCRIPTION */}
             <p className="intro-description">
-
-              Plataforma agrícola com drones inteligentes,
-              monitoramento contínuo e análise avançada
-              para proteção de lavouras de alta precisão.
-
+              Monitore lavouras, organize a operação e transforme imagens e dados em decisões mais seguras para a sua produção.
             </p>
 
+            <div className="intro-highlights" aria-label="Benefícios da plataforma">
+              {highlights.map(({ icon: Icon, label }) => (
+                <div className="intro-highlight" key={label}>
+                  <span aria-hidden="true">
+                    <Icon size={18} strokeWidth={2} />
+                  </span>
+                  <small>{label}</small>
+                </div>
+              ))}
+            </div>
+
+            <div className="intro-actions">
+              <button
+                type="button"
+                className="intro-button intro-button--primary"
+                onClick={() => navigate("/register")}
+              >
+                <span>Começar agora</span>
+                <ArrowRight size={19} strokeWidth={2.2} />
+              </button>
+
+              <button
+                type="button"
+                className="intro-button intro-button--secondary"
+                onClick={() => navigate("/login")}
+              >
+                <LogIn size={18} strokeWidth={2.1} />
+                <span>Já tenho uma conta</span>
+              </button>
+            </div>
+
+            <p className="intro-footnote">
+              Gestão agrícola, diagnóstico e monitoramento em uma experiência simples.
+            </p>
           </div>
-
-          {/* FEATURES */}
-          <div className="intro-features">
-
-            <div className="feature-chip">
-
-              <ShieldCheck size={15} />
-
-              <span>
-                Alta precisão
-              </span>
-
-            </div>
-
-            <div className="feature-chip">
-
-              <Radar size={15} />
-
-              <span>
-                Tempo real
-              </span>
-
-            </div>
-
-            <div className="feature-chip">
-
-              <TrendingUp size={15} />
-
-              <span>
-                Menos perdas
-              </span>
-
-            </div>
-
-          </div>
-
-          {/* ACTIONS */}
-          <div className="intro-actions">
-
-            <button
-              className="btn-primary"
-              onClick={() => navigate("/register")}
-            >
-
-              <Sparkles size={18} />
-
-              <span>
-                Começar agora
-              </span>
-
-              <ArrowRight size={18} />
-
-            </button>
-
-            <button
-              className="btn-secondary"
-              onClick={() => navigate("/login")}
-            >
-
-              <MonitorSmartphone size={18} />
-
-              <span>
-                Já tenho conta
-              </span>
-
-            </button>
-
-          </div>
-
-          {/* CARD */}
-          <div className="intro-card">
-
-            <div className="intro-card-logo">
-
-              <img
-                src={Logo}
-                alt="Zenith Logo"
-                draggable="false"
-              />
-
-            </div>
-
-            <div>
-
-              <h3>
-                Zenith
-              </h3>
-
-              <p>
-                Plataforma inteligente de drones agrícolas
-                para monitoramento e proteção de lavouras.
-              </p>
-
-            </div>
-
-          </div>
-
-        </div>
-
-      </section>
-
+        </section>
+      </div>
     </main>
-
   )
-
 }
