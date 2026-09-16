@@ -21,6 +21,40 @@ const MOBILE_AUTH_HOSTS = new Set([
   "zenith-moblie.vercel.app",
 ])
 
+const SOCIAL_PROVIDER_IDS = {
+  google: "google.com",
+  outlook: "microsoft.com",
+}
+
+function createSocialProvider(providerId) {
+  if (providerId === SOCIAL_PROVIDER_IDS.google) {
+    const provider = new GoogleAuthProvider()
+    provider.setCustomParameters({ prompt: "select_account" })
+    return provider
+  }
+
+  if (providerId === SOCIAL_PROVIDER_IDS.outlook) {
+    const provider = new OAuthProvider(SOCIAL_PROVIDER_IDS.outlook)
+    provider.addScope("email")
+    provider.addScope("profile")
+    provider.setCustomParameters({
+      prompt: "select_account",
+      tenant: "common",
+    })
+    return provider
+  }
+
+  return null
+}
+
+function isEmbeddedPage() {
+  try {
+    return window.self !== window.top
+  } catch {
+    return true
+  }
+}
+
 function isValidEmail(value) {
   return EMAIL_REGEX.test(value.trim())
 }
@@ -199,8 +233,9 @@ export default function Login({ setAppLoading }) {
   useEffect(() => {
     const user = auth.currentUser
     const pendingSocialLogin = sessionStorage.getItem("zenithPendingSocialLogin")
+    const requestedSocialLogin = new URLSearchParams(window.location.search).has("socialLogin")
 
-    if (user && !pendingSocialLogin) {
+    if (user && !pendingSocialLogin && !requestedSocialLogin) {
       devLog("Usuário já está logado:", user.email)
       goToRoleHome(user)
       return
@@ -219,12 +254,42 @@ export default function Login({ setAppLoading }) {
   const clearAlertMsg = useCallback(() => setAlert({ type: "", text: "" }), [])
 
   useEffect(() => {
-    const pendingProvider = sessionStorage.getItem("zenithPendingSocialLogin")
-    if (!pendingProvider) return undefined
-
     let active = true
 
-    async function finishSocialLogin() {
+    async function handleSocialLogin() {
+      const currentUrl = new URL(window.location.href)
+      const requestedProvider = currentUrl.searchParams.get("socialLogin")
+
+      if (requestedProvider) {
+        const provider = createSocialProvider(requestedProvider)
+        currentUrl.searchParams.delete("socialLogin")
+        window.history.replaceState({}, "", `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`)
+
+        if (!provider) {
+          showAlertMsg("error", FIREBASE_ERROR_DEFAULT)
+          return
+        }
+
+        sessionStorage.setItem("zenithPendingSocialLogin", provider.providerId)
+        setLoading(true)
+
+        try {
+          await signInWithRedirect(auth, provider)
+        } catch (error) {
+          sessionStorage.removeItem("zenithPendingSocialLogin")
+          console.error(error)
+          if (!active) return
+
+          const message = FIREBASE_ERROR_MESSAGES[error.code] ?? FIREBASE_ERROR_DEFAULT
+          showAlertMsg("error", message)
+          setLoading(false)
+        }
+        return
+      }
+
+      const pendingProvider = sessionStorage.getItem("zenithPendingSocialLogin")
+      if (!pendingProvider) return
+
       setLoading(true)
 
       try {
@@ -254,7 +319,7 @@ export default function Login({ setAppLoading }) {
       }
     }
 
-    finishSocialLogin()
+    handleSocialLogin()
 
     return () => {
       active = false
@@ -303,17 +368,6 @@ export default function Login({ setAppLoading }) {
     [handleLogin]
   )
 
-  const googleProvider = new GoogleAuthProvider()
-  googleProvider.setCustomParameters({ prompt: "select_account" })
-
-  const outlookProvider = new OAuthProvider("microsoft.com")
-  outlookProvider.addScope("email")
-  outlookProvider.addScope("profile")
-  outlookProvider.setCustomParameters({
-    prompt: "select_account",
-    tenant: "common"
-  })
-
   const signInWithProvider = async (provider) => {
     const hostname = window.location.hostname.toLowerCase()
     const isLocalDevelopment = hostname === "localhost" || hostname === "127.0.0.1"
@@ -329,6 +383,33 @@ export default function Login({ setAppLoading }) {
     setLoading(true)
     clearAlertMsg()
 
+    if (isEmbeddedPage()) {
+      const externalLoginUrl = new URL("/login", window.location.origin)
+      externalLoginUrl.searchParams.set("socialLogin", provider.providerId)
+
+      try {
+        window.top.location.href = externalLoginUrl.toString()
+        return
+      } catch {
+        // O sandbox pode impedir a navegação da janela principal.
+      }
+
+      const externalWindow = window.open(externalLoginUrl.toString(), "_blank")
+
+      if (externalWindow) {
+        externalWindow.opener = null
+        setLoading(false)
+        return
+      }
+
+      showAlertMsg(
+        "error",
+        "O simulador bloqueou a autenticação. Abra o Zenith em uma nova aba para entrar.",
+      )
+      setLoading(false)
+      return
+    }
+
     try {
       sessionStorage.setItem("zenithPendingSocialLogin", provider.providerId)
       await signInWithRedirect(auth, provider)
@@ -342,11 +423,11 @@ export default function Login({ setAppLoading }) {
   }
 
   const handleGoogleLogin = async () => {
-    await signInWithProvider(googleProvider)
+    await signInWithProvider(createSocialProvider(SOCIAL_PROVIDER_IDS.google))
 }
 
 const handleOutlookLogin = async () => {
-    await signInWithProvider(outlookProvider)
+    await signInWithProvider(createSocialProvider(SOCIAL_PROVIDER_IDS.outlook))
 }
 
   /* ── RENDER ── */
