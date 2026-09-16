@@ -5,8 +5,6 @@ import { getRoleHomePath, getUserAccessProfile } from "../../services/accessCont
 import {
   signInWithEmailAndPassword,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   GoogleAuthProvider,
   OAuthProvider,
 } from "firebase/auth"
@@ -16,6 +14,11 @@ import "../../styles/App/Login.css"
    UTILS
 ───────────────────────────────────────── */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const MOBILE_AUTH_HOSTS = new Set([
+  "instalacao-mobile.vercel.app",
+  "zenith-moblie.vercel.app",
+])
 
 function isValidEmail(value) {
   return EMAIL_REGEX.test(value.trim())
@@ -42,7 +45,7 @@ const FIREBASE_ERROR_MESSAGES = {
   "auth/network-request-failed":
     "Erro de conexão! Verifique sua internet. 🌐",
   "auth/popup-blocked":
-    "O navegador bloqueou a janela. Vamos abrir o login em tela cheia.",
+    "O navegador bloqueou a janela do login. Autorize pop-ups para este site e tente novamente.",
   "auth/popup-closed-by-user":
     "Login cancelado antes de concluir.",
   "auth/unauthorized-domain":
@@ -213,25 +216,6 @@ export default function Login({ setAppLoading }) {
   const showAlertMsg  = useCallback((type, text) => setAlert({ type, text }), [])
   const clearAlertMsg = useCallback(() => setAlert({ type: "", text: "" }), [])
 
-  useEffect(() => {
-    async function finishRedirectLogin() {
-      try {
-        const result = await getRedirectResult(auth)
-
-        if (result?.user) {
-          showAlertMsg("success", "Login realizado com sucesso! 🚀")
-          await goToRoleHome(result.user)
-        }
-      } catch (error) {
-        console.error(error)
-        const message = FIREBASE_ERROR_MESSAGES[error.code] ?? FIREBASE_ERROR_DEFAULT
-        showAlertMsg("error", message)
-      }
-    }
-
-    finishRedirectLogin()
-  }, [goToRoleHome, showAlertMsg])
-
   /* ── Handlers ── */
   const handleEmailChange     = useCallback((e) => setEmail(e.target.value), [])
   const handlePasswordChange  = useCallback((e) => setPassword(e.target.value), [])
@@ -286,6 +270,17 @@ export default function Login({ setAppLoading }) {
   })
 
   const signInWithProvider = async (provider, successMessage) => {
+    const hostname = window.location.hostname.toLowerCase()
+    const isLocalDevelopment = hostname === "localhost" || hostname === "127.0.0.1"
+
+    if (import.meta.env.PROD && !isLocalDevelopment && !MOBILE_AUTH_HOSTS.has(hostname)) {
+      showAlertMsg(
+        "error",
+        "Este endereço não está habilitado para o login do Zenith Mobile.",
+      )
+      return
+    }
+
     setLoading(true)
     clearAlertMsg()
 
@@ -295,13 +290,6 @@ export default function Login({ setAppLoading }) {
       await goToRoleHome(credential.user)
     } catch (error) {
       console.error(error)
-
-      if (error.code === "auth/popup-blocked") {
-        showAlertMsg("error", FIREBASE_ERROR_MESSAGES[error.code])
-        await signInWithRedirect(auth, provider)
-        return
-      }
-
       const message = FIREBASE_ERROR_MESSAGES[error.code] ?? FIREBASE_ERROR_DEFAULT
       showAlertMsg("error", message)
     } finally {
