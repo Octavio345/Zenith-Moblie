@@ -4,7 +4,8 @@ import { auth } from "../../services/firebase"
 import { getRoleHomePath, getUserAccessProfile } from "../../services/accessControl"
 import {
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   OAuthProvider,
 } from "firebase/auth"
@@ -197,8 +198,9 @@ export default function Login({ setAppLoading }) {
   /* ── useEffect: verificar sessão + email salvo ── */
   useEffect(() => {
     const user = auth.currentUser
+    const pendingSocialLogin = sessionStorage.getItem("zenithPendingSocialLogin")
 
-    if (user) {
+    if (user && !pendingSocialLogin) {
       devLog("Usuário já está logado:", user.email)
       goToRoleHome(user)
       return
@@ -215,6 +217,49 @@ export default function Login({ setAppLoading }) {
   /* ── Helpers de alerta ── */
   const showAlertMsg  = useCallback((type, text) => setAlert({ type, text }), [])
   const clearAlertMsg = useCallback(() => setAlert({ type: "", text: "" }), [])
+
+  useEffect(() => {
+    const pendingProvider = sessionStorage.getItem("zenithPendingSocialLogin")
+    if (!pendingProvider) return undefined
+
+    let active = true
+
+    async function finishSocialLogin() {
+      setLoading(true)
+
+      try {
+        const credential = await getRedirectResult(auth)
+
+        if (!credential?.user) {
+          throw new Error("Não foi possível concluir o login social.")
+        }
+
+        if (!active) return
+
+        const successMessage = pendingProvider === "microsoft.com"
+          ? "Login com Outlook realizado com sucesso! 📧"
+          : "Login com Google realizado com sucesso! 🚀"
+
+        showAlertMsg("success", successMessage)
+        await goToRoleHome(credential.user)
+      } catch (error) {
+        console.error(error)
+        if (!active) return
+
+        const message = FIREBASE_ERROR_MESSAGES[error.code] ?? FIREBASE_ERROR_DEFAULT
+        showAlertMsg("error", message)
+      } finally {
+        sessionStorage.removeItem("zenithPendingSocialLogin")
+        if (active) setLoading(false)
+      }
+    }
+
+    finishSocialLogin()
+
+    return () => {
+      active = false
+    }
+  }, [goToRoleHome, showAlertMsg])
 
   /* ── Handlers ── */
   const handleEmailChange     = useCallback((e) => setEmail(e.target.value), [])
@@ -269,7 +314,7 @@ export default function Login({ setAppLoading }) {
     tenant: "common"
   })
 
-  const signInWithProvider = async (provider, successMessage) => {
+  const signInWithProvider = async (provider) => {
     const hostname = window.location.hostname.toLowerCase()
     const isLocalDevelopment = hostname === "localhost" || hostname === "127.0.0.1"
 
@@ -285,24 +330,23 @@ export default function Login({ setAppLoading }) {
     clearAlertMsg()
 
     try {
-      const credential = await signInWithPopup(auth, provider)
-      showAlertMsg("success", successMessage)
-      await goToRoleHome(credential.user)
+      sessionStorage.setItem("zenithPendingSocialLogin", provider.providerId)
+      await signInWithRedirect(auth, provider)
     } catch (error) {
+      sessionStorage.removeItem("zenithPendingSocialLogin")
       console.error(error)
       const message = FIREBASE_ERROR_MESSAGES[error.code] ?? FIREBASE_ERROR_DEFAULT
       showAlertMsg("error", message)
-    } finally {
       setLoading(false)
     }
   }
 
   const handleGoogleLogin = async () => {
-    await signInWithProvider(googleProvider, "Login com Google realizado com sucesso! 🚀")
+    await signInWithProvider(googleProvider)
 }
 
 const handleOutlookLogin = async () => {
-    await signInWithProvider(outlookProvider, "Login com Outlook realizado com sucesso! 📧")
+    await signInWithProvider(outlookProvider)
 }
 
   /* ── RENDER ── */
