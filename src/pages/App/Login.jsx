@@ -4,8 +4,7 @@ import { auth } from "../../services/firebase"
 import { getRoleHomePath, getUserAccessProfile } from "../../services/accessControl"
 import {
   signInWithEmailAndPassword,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   GoogleAuthProvider,
   OAuthProvider,
 } from "firebase/auth"
@@ -232,10 +231,8 @@ export default function Login({ setAppLoading }) {
   /* ── useEffect: verificar sessão + email salvo ── */
   useEffect(() => {
     const user = auth.currentUser
-    const pendingSocialLogin = sessionStorage.getItem("zenithPendingSocialLogin")
-    const requestedSocialLogin = new URLSearchParams(window.location.search).has("socialLogin")
 
-    if (user && !pendingSocialLogin && !requestedSocialLogin) {
+    if (user) {
       devLog("Usuário já está logado:", user.email)
       goToRoleHome(user)
       return
@@ -252,79 +249,6 @@ export default function Login({ setAppLoading }) {
   /* ── Helpers de alerta ── */
   const showAlertMsg  = useCallback((type, text) => setAlert({ type, text }), [])
   const clearAlertMsg = useCallback(() => setAlert({ type: "", text: "" }), [])
-
-  useEffect(() => {
-    let active = true
-
-    async function handleSocialLogin() {
-      const currentUrl = new URL(window.location.href)
-      const requestedProvider = currentUrl.searchParams.get("socialLogin")
-
-      if (requestedProvider) {
-        const provider = createSocialProvider(requestedProvider)
-        currentUrl.searchParams.delete("socialLogin")
-        window.history.replaceState({}, "", `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`)
-
-        if (!provider) {
-          showAlertMsg("error", FIREBASE_ERROR_DEFAULT)
-          return
-        }
-
-        sessionStorage.setItem("zenithPendingSocialLogin", provider.providerId)
-        setLoading(true)
-
-        try {
-          await signInWithRedirect(auth, provider)
-        } catch (error) {
-          sessionStorage.removeItem("zenithPendingSocialLogin")
-          console.error(error)
-          if (!active) return
-
-          const message = FIREBASE_ERROR_MESSAGES[error.code] ?? FIREBASE_ERROR_DEFAULT
-          showAlertMsg("error", message)
-          setLoading(false)
-        }
-        return
-      }
-
-      const pendingProvider = sessionStorage.getItem("zenithPendingSocialLogin")
-      if (!pendingProvider) return
-
-      setLoading(true)
-
-      try {
-        const credential = await getRedirectResult(auth)
-
-        if (!credential?.user) {
-          throw new Error("Não foi possível concluir o login social.")
-        }
-
-        if (!active) return
-
-        const successMessage = pendingProvider === "microsoft.com"
-          ? "Login com Outlook realizado com sucesso! 📧"
-          : "Login com Google realizado com sucesso! 🚀"
-
-        showAlertMsg("success", successMessage)
-        await goToRoleHome(credential.user)
-      } catch (error) {
-        console.error(error)
-        if (!active) return
-
-        const message = FIREBASE_ERROR_MESSAGES[error.code] ?? FIREBASE_ERROR_DEFAULT
-        showAlertMsg("error", message)
-      } finally {
-        sessionStorage.removeItem("zenithPendingSocialLogin")
-        if (active) setLoading(false)
-      }
-    }
-
-    handleSocialLogin()
-
-    return () => {
-      active = false
-    }
-  }, [goToRoleHome, showAlertMsg])
 
   /* ── Handlers ── */
   const handleEmailChange     = useCallback((e) => setEmail(e.target.value), [])
@@ -385,10 +309,10 @@ export default function Login({ setAppLoading }) {
 
     if (isEmbeddedPage()) {
       const externalLoginUrl = new URL("/login", window.location.origin)
-      externalLoginUrl.searchParams.set("socialLogin", provider.providerId)
 
       try {
         window.top.location.href = externalLoginUrl.toString()
+        setLoading(false)
         return
       } catch {
         // O sandbox pode impedir a navegação da janela principal.
@@ -404,20 +328,25 @@ export default function Login({ setAppLoading }) {
 
       showAlertMsg(
         "error",
-        "O simulador bloqueou a autenticação. Abra o Zenith em uma nova aba para entrar.",
+        "O Google não permite login dentro do simulador. Abra o Zenith na nova aba e clique novamente em Entrar com Google.",
       )
       setLoading(false)
       return
     }
 
     try {
-      sessionStorage.setItem("zenithPendingSocialLogin", provider.providerId)
-      await signInWithRedirect(auth, provider)
+      const credential = await signInWithPopup(auth, provider)
+      const successMessage = provider.providerId === SOCIAL_PROVIDER_IDS.outlook
+        ? "Login com Outlook realizado com sucesso! 📧"
+        : "Login com Google realizado com sucesso! 🚀"
+
+      showAlertMsg("success", successMessage)
+      await goToRoleHome(credential.user)
     } catch (error) {
-      sessionStorage.removeItem("zenithPendingSocialLogin")
       console.error(error)
       const message = FIREBASE_ERROR_MESSAGES[error.code] ?? FIREBASE_ERROR_DEFAULT
       showAlertMsg("error", message)
+    } finally {
       setLoading(false)
     }
   }
