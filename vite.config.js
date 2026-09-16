@@ -12,7 +12,6 @@ export default defineConfig({
       workbox: {
         globPatterns: [
           '**/*.{js,css,html,ico,svg,woff2}',
-          'assets/icons/zenith-icon-*.png',
         ],
         globIgnores: ['**/webodmService-*.js'],
         skipWaiting: true,
