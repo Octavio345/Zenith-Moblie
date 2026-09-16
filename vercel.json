@@ -2,10 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
-    {
-      "source": "/__/auth/:path*",
-      "destination": "https://zenith-agro.firebaseapp.com/__/auth/:path*"
-    },
     { "source": "/(.*)", "destination": "/" }
   ]
 }
